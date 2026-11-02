@@ -1,0 +1,973 @@
+<title>Blind Positioning Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a lab bench. The arena is the instrument, the rack beside it holds controls and
+   readouts, and the measured results run underneath in one reading column. */
+:root {
+  --bg: #f1f4f5; --surface: #fcfdfd; --ink: #0b0e0f; --ink-2: #4a5053; --ink-3: #6b7276;
+  --grid: #e1e5e6; --axis: #bfc6c9; --wash: rgba(11, 14, 15, .05);
+  --rx: #2a78d6; --tx: #eb6834; --s3: #1baf7a; --s4: #eda100; --accent: #2a78d6; --on-accent: #fff;
+  --good: #0ca30c; --warn: #fab219; --crit: #d03b3b; --good-ink: #006300; --warn-ink: #7a5500; --crit-ink: #b02a2a;
+  --display: Archivo, "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1112; --surface: #181b1c; --ink: #eef1f1; --ink-2: #bcc3c5; --ink-3: #979ea1;
+  --grid: #2a2e30; --axis: #41474a; --wash: rgba(255, 255, 255, .06);
+  --rx: #3987e5; --tx: #d95926; --s3: #199e70; --s4: #c98500; --accent: #3987e5; --on-accent: #fff;
+  --good-ink: #2fc42f; --warn-ink: #fab219; --crit-ink: #ec7272; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #0e1112; --surface: #181b1c; --ink: #eef1f1; --ink-2: #bcc3c5; --ink-3: #979ea1;
+  --grid: #2a2e30; --axis: #41474a; --wash: rgba(255, 255, 255, .06);
+  --rx: #3987e5; --tx: #d95926; --s3: #199e70; --s4: #c98500; --accent: #3987e5; --on-accent: #fff;
+  --good-ink: #2fc42f; --warn-ink: #fab219; --crit-ink: #ec7272; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 400 15px/1.55 var(--body); }
+.page { max-width: 1120px; margin: 0 auto; padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 40px; }
+h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(26px, 4vw, 38px); font-weight: 700; line-height: 1.1; letter-spacing: -.01em; }
+h2 { font-size: 23px; font-weight: 600; line-height: 1.2; }
+h3 { font-size: 15px; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+.lede { color: var(--ink-2); font-size: 16px; }
+header { display: grid; gap: 8px; }
+.label { font: 500 11px/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* bench */
+.bench { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+.arena-wrap { background: var(--surface); border: 1px solid var(--grid); border-radius: 6px; padding: 10px; display: grid; gap: 8px; min-width: 0; }
+#arena { width: 100%; max-width: 100%; max-height: 82vh; aspect-ratio: 1; display: block; margin-inline: auto; user-select: none; -webkit-user-select: none; }
+.hit { cursor: grab; touch-action: none; fill: transparent; outline: none; }
+.hit.pinned { cursor: not-allowed; }
+.hit:focus-visible { stroke: var(--ink); stroke-width: .004; }
+.key { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--ink-2); align-items: center; }
+.key span { display: inline-flex; gap: 6px; align-items: center; }
+.key svg { width: 14px; height: 14px; flex: none; }
+.rack { display: grid; gap: 12px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--grid); border-radius: 6px; padding: 14px; display: grid; gap: 12px; min-width: 0; }
+.row { display: grid; gap: 5px; }
+.row-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.row-head output { font: 400 12.5px var(--mono); color: var(--ink); text-align: right; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+input[type="range"] { width: 100%; margin: 0; accent-color: var(--accent); height: 22px; }
+.seg { display: flex; flex-wrap: wrap; gap: 2px; background: var(--wash); border-radius: 5px; padding: 2px; }
+.seg button { flex: 1 1 auto; border: 0; background: transparent; color: var(--ink-2); font: 500 12.5px var(--body); padding: 6px 8px; border-radius: 4px; cursor: pointer; min-height: 32px; white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--axis); }
+.btn { border: 1px solid var(--axis); background: transparent; color: var(--ink); font: 600 13px var(--body); padding: 8px 12px; border-radius: 5px; cursor: pointer; min-height: 36px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.stat b { display: block; font: 500 25px/1.15 var(--mono); }
+.status { display: grid; gap: 6px; font-size: 13px; }
+.status > div { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 8px; align-items: start; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.chip::before { content: ""; width: 9px; height: 9px; border-radius: 2px; background: var(--dot, var(--axis)); flex: none; }
+.chip.good { --dot: var(--good); color: var(--good-ink); }
+.chip.warn { --dot: var(--warn); color: var(--warn-ink); }
+.chip.bad { --dot: var(--crit); color: var(--crit-ink); }
+.chip.idle { color: var(--ink-2); }
+#readings { border-collapse: separate; border-spacing: 2px; width: 100%; table-layout: fixed; font: 400 10.5px var(--mono); }
+#readings th { font-weight: 500; color: var(--ink-3); }
+#readings td { text-align: center; padding: 3px 0; border-radius: 2px; font-variant-numeric: tabular-nums; }
+.note { font-size: 13px; color: var(--ink-2); }
+#spark { width: 100%; height: 86px; display: block; }
+
+/* results */
+.results { display: grid; gap: 44px; }
+section { display: grid; gap: 14px; min-width: 0; }
+.verdict { background: var(--surface); border: 1px solid var(--grid); border-radius: 6px; padding: 20px; display: grid; gap: 14px; }
+.verdict ul { margin: 0; padding-left: 18px; display: grid; gap: 9px; max-width: 72ch; }
+.filters { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; }
+.filters .row { min-width: 150px; }
+select { font: 400 13px var(--body); padding: 6px 8px; border: 1px solid var(--axis); border-radius: 4px; background: var(--surface); color: var(--ink); min-height: 34px; }
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; }
+.chart { background: var(--surface); border: 1px solid var(--grid); border-radius: 6px; padding: 14px; display: grid; gap: 8px; min-width: 0; position: relative; align-content: start; }
+.chart svg { width: 100%; display: block; overflow: visible; }
+.chart text { font: 400 11px var(--body); fill: var(--ink-2); }
+.chart .tick { font-family: var(--mono); font-size: 10.5px; fill: var(--ink-3); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.scroll { overflow-x: auto; }
+table.grid-table { border-collapse: separate; border-spacing: 2px; font: 400 12px var(--mono); font-variant-numeric: tabular-nums; }
+table.grid-table th { font-weight: 500; color: var(--ink-3); padding: 3px 7px; }
+table.grid-table td { text-align: center; padding: 6px 2px; min-width: 40px; border-radius: 2px; }
+table.grid-table td.axis-title, table.grid-table th.axis-title { font: 400 11.5px var(--body); color: var(--ink-3); }
+.data-table { border-collapse: collapse; font-size: 13px; width: 100%; }
+.data-table th { text-align: left; font: 500 11px var(--mono); letter-spacing: .03em; color: var(--ink-3); padding: 6px 10px 6px 0; border-bottom: 1px solid var(--axis); vertical-align: bottom; }
+.data-table td { padding: 6px 10px 6px 0; border-bottom: 1px solid var(--grid); vertical-align: top; }
+.data-table td.n, .data-table th.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+details { font-size: 13px; color: var(--ink-2); }
+summary { cursor: pointer; font-weight: 500; padding-block: 2px; }
+details > .scroll { margin-top: 8px; }
+.tip { position: absolute; z-index: 5; pointer-events: none; background: var(--ink); color: var(--surface); font: 400 12px/1.4 var(--body); padding: 6px 9px; border-radius: 4px; max-width: 240px; }
+.tip b { font-weight: 600; }
+.tip[hidden] { display: none; }
+code { font: 400 12.5px var(--mono); background: var(--wash); padding: 1px 4px; border-radius: 3px; overflow-wrap: anywhere; }
+.assume { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 14px 24px; }
+.assume div { display: grid; gap: 3px; }
+@media (max-width: 860px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+</style>
+
+<div class="page">
+  <header>
+    <div class="label">n receivers · k sources · no position sensors</div>
+    <h1>How well can a system find its own devices from signals alone?</h1>
+    <p class="lede">Each receiver gets one reading per source, and that reading depends only on the distance between them. Drag anything here. The system never sees your hand, only the table of readings.</p>
+  </header>
+
+  <div class="bench">
+    <div class="arena-wrap">
+      <svg id="arena" viewBox="-0.04 -0.04 1.08 1.08" role="application" aria-label="Arena. Drag or use arrow keys to move devices."></svg>
+      <div class="key" aria-hidden="true">
+        <span><svg viewBox="-1 -1 2 2"><circle r=".8" fill="var(--rx)"/></svg>Receiver</span>
+        <span><svg viewBox="-1 -1 2 2"><rect x="-.62" y="-.62" width="1.24" height="1.24" transform="rotate(45)" fill="var(--tx)"/></svg>Source</span>
+        <span><svg viewBox="-1 -1 2 2"><circle r=".7" fill="none" stroke="var(--ink-2)" stroke-width=".3"/></svg>Where the system thinks it is</span>
+        <span>Shift-drag moves everything together</span>
+      </div>
+    </div>
+
+    <div class="rack">
+      <div class="panel">
+        <div class="status" aria-live="off">
+          <div><span class="label">Actually</span><span id="truthChip" class="chip idle">Off</span></div>
+          <div><span class="label">System's view</span><span id="selfChip" class="chip idle">Off</span></div>
+          <div><span class="label">This setup</span><span id="setupNote" class="note"></span></div>
+        </div>
+        <div class="stats">
+          <div class="stat"><span class="label">Layout error</span><b id="shapeErr">–</b></div>
+          <div class="stat"><span class="label">Position error</span><b id="absErr">–</b></div>
+        </div>
+        <svg id="spark" viewBox="0 0 310 86" preserveAspectRatio="none" role="img" aria-label="Recent error over time"></svg>
+        <div class="legend" aria-hidden="true"><span><i style="background:var(--rx)"></i>Layout, with rotation and shift forgiven</span><span><i style="background:var(--tx)"></i>Position, nothing forgiven</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="actions">
+          <button id="power" class="btn primary" type="button">Turn off</button>
+          <button id="shuffle" class="btn" type="button">New layout</button>
+        </div>
+        <div class="pair">
+          <div class="row"><div class="row-head"><label class="label" for="nIn">Receivers</label><output id="nOut" for="nIn"></output></div><input id="nIn" type="range" min="1" max="8" value="4"></div>
+          <div class="row"><div class="row-head"><label class="label" for="kIn">Sources</label><output id="kOut" for="kIn"></output></div><input id="kIn" type="range" min="1" max="8" value="4"></div>
+        </div>
+        <div class="row"><span class="label" id="motionL">Motion</span><div class="seg" id="motion" role="group" aria-labelledby="motionL">
+          <button type="button" data-v="hand">By hand</button><button type="button" data-v="all">All wander</button><button type="button" data-v="one">One at a time</button><button type="button" data-v="jump">Teleports</button><button type="button" data-v="rigid">Whole group</button>
+        </div></div>
+        <div class="row"><div class="row-head"><label class="label" for="speedIn">Speed</label><output id="speedOut" for="speedIn"></output></div><input id="speedIn" type="range" min="0" max="5" step="1" value="2"></div>
+        <div class="row"><span class="label" id="viewL">Draw the system's belief</span><div class="seg" id="view" role="group" aria-labelledby="viewL">
+          <button type="button" data-v="raw">As it stands</button><button type="button" data-v="aligned">Lined up with reality</button>
+        </div></div>
+        <div class="row"><span class="label" id="signalL">Signal</span><div class="seg" id="signal" role="group" aria-labelledby="signalL">
+          <button type="button" data-v="range">Timing</button><button type="button" data-v="strength">Strength</button>
+        </div></div>
+        <div class="row"><div class="row-head"><label class="label" for="noiseIn">Noise</label><output id="noiseOut" for="noiseIn"></output></div><input id="noiseIn" type="range" min="0" max="5" step="1" value="2"></div>
+        <div class="row"><span class="label" id="startL">At switch-on, the system</span><div class="seg" id="start" role="group" aria-labelledby="startL">
+          <button type="button" data-v="known">Is told the layout</button><button type="button" data-v="cold">Works it out</button>
+        </div></div>
+        <div class="row"><div class="row-head"><label class="label" for="pinIn">Sources that never move</label><output id="pinOut" for="pinIn"></output></div><input id="pinIn" type="range" min="0" max="3" step="1" value="0"></div>
+      </div>
+
+      <div class="panel">
+        <div class="row-head"><span class="label">What the system sees</span><span class="note" id="readUnit"></span></div>
+        <div class="scroll"><table id="readings"></table></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="results">
+    <section class="verdict" id="verdict">
+      <h2>The short answer</h2>
+      <p class="lede">The layout can be recovered reliably with enough devices and slow enough motion. Absolute position can't be, unless something stays put. With 6 receivers, 6 sources and timing noise of 1% of the arena, the layout was correct for 100% of readings when every device moved up to 3% of the arena between readings, and 95% at 10%.</p>
+      <ul>
+        <li><b>How many you need.</b> On a surface, at least 3 receivers and 3 sources. 3 × 3 is ambiguous, with up to 4 exact fits found. Every count tested from 3 × 4 up had one. In 3D, 4 × 6 or 5 × 5 fixes the layout locally, and one exact fit starts at 4 × 7 or 5 × 6.</li>
+        <li><b>One snapshot.</b> At 1% timing noise on random layouts: 3 × 4 solved 65%, 4 × 4 82%, 5 × 5 97%, 6 × 6 100%.</li>
+        <li><b>Speed is the main limit.</b> At 4 × 4 with everything moving, correct readings fall from 97% at 1% of the arena per reading to 90% at 3% and 53% at 10%. Moving one device at a time holds up far better: 100%, 97% and 95%.</li>
+        <li><b>The typical failure is a mirror flip.</b> A mirror image gives identical readings, so once the layout flips, the readings can't correct it. At 4 × 4 and 10% per reading, 32% of readings were mirrored. Three pinned sources took the mirrored share from 31% to 5%, and correct readings from 55% to 87%, in a separate comparison.</li>
+        <li><b>Absolute position drifts.</b> The group's net motion leaves no trace in the readings. At 6 × 6 with everything moving, median position error reached 42% of the arena after 1,000 readings. One pinned source gave 23%, and two gave 1%. At 4 × 4 two pins can still leave a mirror image across the line between them, so three is the safe number: 90th-percentile error of 50% with two, 1.8% with three.</li>
+        <li><b>The system mostly can't tell when it's wrong.</b> False alarms stay rare, under 2% for 4 × 4 and larger at speeds up to 3%, but most wrong readings also pass the fit check. At 4 × 4 and 3% per reading, 4 of the 5 points of wrong readings went unnoticed, and 3 × 3 has no spare readings to check with at all.</li>
+        <li><b>Signal strength is much harder than timing.</b> A single snapshot almost never works at 20% distance noise (7% solved at best). Tracking at 6 × 6 can still work by averaging, if motion is slow: at 30% noise it was correct 99% of the time at 0.1% per reading, 52% at 0.3%, and 5% at 1%.</li>
+        <li><b>Being told the starting layout matters little from 4 × 4 up.</b> Correct readings were 96% told versus 97% worked out, at 1% per reading. It matters more at 3 × 4: 85% versus 77%. A system that works it out still has no absolute position or handedness of its own. These tests line it up with reality once at the start.</li>
+      </ul>
+    </section>
+
+    <section id="sec-solvable">
+      <h2>Can the readings pin down one layout at all?</h2>
+      <p>Before noise matters, there may be too few readings. These counts use perfect readings on random layouts: each cell gives the most distinct layouts found that reproduce every reading exactly. Rotated, shifted and mirrored copies count as the same layout.</p>
+      <div class="chart-grid">
+        <div class="chart"><h3>Devices on a surface (2D)</h3><div class="scroll" id="solv2"></div></div>
+        <div class="chart"><h3>Devices in a room (3D)</h3><div class="scroll" id="solv3"></div></div>
+      </div>
+      <div class="legend" id="solvLegend"></div>
+      <p>These counts come from a search of up to 600 random starts on each of 6 layouts, so they are lower bounds on the number of fits rather than proofs.</p>
+    </section>
+
+    <section id="sec-cold">
+      <h2>One snapshot, no history</h2>
+      <p id="coldIntro">Share of random layouts solved from a single table of readings, with layout error under 5% of the arena side. A mirror image counts as solved, since the readings can't tell the two apart.</p>
+      <div class="filters">
+        <div class="row"><span class="label">Signal</span><div class="seg" id="coldSignal" role="group" aria-label="Signal for snapshot chart"><button type="button" data-v="range">Timing</button><button type="button" data-v="strength">Strength</button></div></div>
+        <div class="row" style="min-width:min(100%,240px)"><div class="row-head"><label class="label" for="coldNoise">Noise</label><output id="coldNoiseOut" for="coldNoise"></output></div><input id="coldNoise" type="range" min="0" max="4" step="1" value="2"></div>
+      </div>
+      <div class="chart-grid">
+        <div class="chart"><h3>Solved within 5%</h3><div class="scroll" id="coldHeat"></div></div>
+        <div class="chart"><h3>Layouts whose expected error can reach 5%</h3><div class="scroll" id="boundHeat"></div><p class="note">From the Cramér-Rao bound on the same layouts. A left-hand value well below this one means wrong layouts that still fit, as at 3 × 3, or a solver miss. At high noise the left value can be higher, because one noisy trial can land under 5% by luck.</p></div>
+      </div>
+      <p>In 3D the same counts are much weaker, because each device has one more coordinate to find. Timing noise of 0.5% solved 6% at 4 × 4, 86% at 6 × 6 and 100% at 8 × 8. At 2% noise it solved 33% at 6 × 6 and 85% at 8 × 8.</p>
+    </section>
+
+    <section id="sec-track">
+      <h2>Tracking, starting from a known layout</h2>
+      <p>The system follows along for 300 readings. A reading counts as correct when layout error is under 5%, mirrored when the layout is right but flipped, and wrong otherwise. Speed is how far a moving device travels between readings.</p>
+      <div class="filters">
+        <div class="row"><span class="label">Signal</span><div class="seg" id="trackSignal" role="group" aria-label="Signal for tracking charts"><button type="button" data-v="range">Timing</button><button type="button" data-v="strength">Strength</button></div></div>
+        <div class="row"><label class="label" for="trackNoise">Noise</label><select id="trackNoise"></select></div>
+        <div class="row"><span class="label">Who moves</span><div class="seg" id="trackKind" role="group" aria-label="Who moves"><button type="button" data-v="all">All at once</button><button type="button" data-v="one">One at a time</button></div></div>
+        <div class="row"><label class="label" for="trackSize">Breakdown for</label><select id="trackSize"></select></div>
+      </div>
+      <div class="chart-grid">
+        <div class="chart"><h3>Readings with the correct layout</h3><div id="trackLines"></div><div class="legend" id="trackLegend"></div></div>
+        <div class="chart"><h3 id="stackTitle"></h3><div id="trackStack"></div><div class="legend" id="stackLegend"></div></div>
+      </div>
+      <details><summary>All values for this selection</summary><div class="scroll" id="trackTable"></div></details>
+      <p><b>High correct rates still hide brief losses.</b> At 4 × 4 and 1% per reading, 97% of readings were correct, yet only 45% of the 300-reading runs stayed under 5% the whole way. <b>Recovery matters.</b> When readings stop fitting, the system re-solves from scratch. Turning that off dropped 4 × 4 at 3% per reading from 86% to 62%, and 6 × 6 at 10% from 98% to 63%. <b>Teleports</b>, with one device jumping anywhere every 30 readings at 1% noise, gave 38% correct at 3 × 3, 87% at 4 × 4 and 99% at 6 × 6.</p>
+    </section>
+
+    <section id="sec-drift">
+      <h2>Absolute position needs something that stays put</h2>
+      <p id="driftIntro">Readings only describe devices relative to each other. Here tracking runs for 1,000 readings with 1% timing noise at 1% of the arena per reading, and pinned sources are ones the system knows never move.</p>
+      <div class="filters">
+        <div class="row"><span class="label">Who moves</span><div class="seg" id="driftKind" role="group" aria-label="Who moves in drift chart"><button type="button" data-v="all">All at once</button><button type="button" data-v="one">One at a time</button></div></div>
+        <div class="row"><label class="label" for="driftSize">Devices</label><select id="driftSize"><option value="4">4 × 4</option><option value="6">6 × 6</option></select></div>
+      </div>
+      <div class="chart"><h3>Median position error over time</h3><div id="driftLines"></div><div class="legend" id="driftLegend"></div></div>
+      <details><summary>All values for this selection</summary><div class="scroll" id="driftTable"></div></details>
+    </section>
+
+    <section id="sec-place">
+      <h2>Where you place things matters</h2>
+      <p>Single-snapshot results at 1% timing noise. Solved means layout error under 5%. The bound is the median error the geometry allows locally.</p>
+      <div class="scroll"><table class="data-table" id="placeTable"></table></div>
+      <p>Random placement is already good, and surrounding the receivers with sources did no better: at 4 × 4 it solved 67% against 87% for random. Two placements fail outright. With sources in a line, each receiver can flip across that line without changing a reading, so the local bound looks fine while the solver is often wrong. Two distant clusters barely constrain how the groups are arranged. A bound of "none" means the exact geometry has a first-order blind spot. Parallel lines fail because of it, but devices exactly on one circle still solve well from 4 × 4 up.</p>
+    </section>
+
+    <section id="sec-assume">
+      <h2>What these numbers assume</h2>
+      <div class="assume">
+        <div><h3>Clean signal model</h3><p class="note">Readings depend only on distance, and the system knows that law and the noise level exactly. Multipath, blocked paths, outliers and uneven device gains aren't modeled, so real hardware will do worse than these numbers.</p></div>
+        <div><h3>A full table every time</h3><p class="note">Every receiver hears every source, tells the sources apart, and reads them all at the same moment. Timing assumes synchronized clocks. Unsynchronized clocks would add unknowns.</p></div>
+        <div><h3>Scale</h3><p class="note">Error is RMS per device as a share of the arena side, so 5% is 50 cm in a 10 m room. "Correct" means under 5%, so a wrong reading can be just over that line. The strength dB figures assume a path-loss exponent of 2.</p></div>
+        <div><h3>Real-world orientation</h3><p class="note">As rules of thumb not tested here, ultra-wideband ranging is often quoted near 10 cm, about 1% of a 10 m room, and indoor Bluetooth or Wi-Fi strength often varies by several dB, which is past the 30% column.</p></div>
+        <div><h3>Sample sizes</h3><p class="note">Snapshot cells use 200 random layouts, or 100 in 3D. Tracking cells use 60 runs of 300 readings, or 30 runs at 8 × 8. A flip lasts for the rest of a run, so treat tracking percentages as good to about 10 points.</p></div>
+        <div><h3>Check it yourself</h3><p class="note">The solver's error matches the Cramér-Rao bound within 7% at low noise, in the test suite. Run <code>node --test engine.test.js</code> for tests, <code>node sweep.js</code> for this data (about 20 minutes), and <code>node build.js</code> to rebuild the page.</p></div>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script src="engine.js"></script>
+<script src="results.js"></script>
+<script>
+(function () {
+'use strict';
+const E = window.Engine;
+const R = window.RESULTS;
+const $ = (id) => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+const reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const svgEl = (tag, attrs, parent) => {
+  const e = document.createElementNS(NS, tag);
+  for (const a in attrs) e.setAttribute(a, attrs[a]);
+  if (parent) parent.appendChild(e);
+  return e;
+};
+const pct = (v, d = 1) => (v * 100).toFixed(d) + '%';
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+function bindSeg(el, value, onChange) {
+  const buttons = [...el.querySelectorAll('button')];
+  const paint = (v) => buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+  paint(value);
+  buttons.forEach((b) => b.addEventListener('click', () => { paint(b.dataset.v); onChange(b.dataset.v); }));
+  return paint;
+}
+
+// ================= live bench =================
+const SAMPLE_MS = 50;
+const NOISE = { range: [0.002, 0.005, 0.01, 0.02, 0.03, 0.05], strength: [0.02, 0.05, 0.1, 0.2, 0.3, 0.4] };
+const SPEEDS = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3];
+const LOST = 0.05;
+const rng = E.Rng(Date.now() >>> 0);
+const S = {
+  n: 4, k: 4, on: true, signal: 'range', noiseI: 2, speedI: 2, motion: reduced ? 'hand' : 'one', view: 'raw', start: 'known', pins: 0,
+  x: null, tracker: null, p: null, move: null, y: null, history: [], drag: null, group: null, lastTable: 0,
+};
+const seeded = E.Rng(20261101);
+
+function randomLayout(n, k, r) {
+  const x = new Float64Array((n + k) * 2);
+  // Spread the opening layout enough that it is well conditioned.
+  for (let a = 0; a < n + k; a++) { x[2 * a] = 0.08 + 0.84 * r.uniform(); x[2 * a + 1] = 0.08 + 0.84 * r.uniform(); }
+  return x;
+}
+S.x = randomLayout(S.n, S.k, seeded);
+
+function pinList() {
+  const count = Math.min(S.pins, S.k);
+  return Array.from({ length: count }, (_, i) => S.n + i);
+}
+
+function makeProblem() {
+  S.p = E.problem({ n: S.n, k: S.k, model: S.signal, sigma: NOISE[S.signal][S.noiseI] });
+}
+
+function resetMotion() {
+  S.group = null;
+  if (S.motion === 'hand') { S.move = null; return; }
+  if (S.motion === 'rigid') { S.group = { base: Float64Array.from(S.x), t: 0 }; S.move = rigidStep; return; }
+  S.move = E.makeMotion(S.motion, S.p, S.x, rng, { speed: SPEEDS[S.speedI], anchors: pinList(), every: 40 });
+}
+
+function rigidStep() {
+  // The whole arrangement turns and shifts as one, kept inside the arena.
+  const g = S.group;
+  g.t += SPEEDS[S.speedI] / 0.35;
+  const count = S.n + S.k;
+  const a = 0.9 * Math.sin(g.t * 0.5), c = Math.cos(a), s = Math.sin(a);
+  let cx = 0, cy = 0;
+  for (let d = 0; d < count; d++) { cx += g.base[2 * d]; cy += g.base[2 * d + 1]; }
+  cx /= count; cy /= count;
+  let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+  for (let d = 0; d < count; d++) {
+    const u = g.base[2 * d] - cx, v = g.base[2 * d + 1] - cy;
+    const X = c * u - s * v + cx + 0.15 * Math.sin(g.t * 0.31), Y = s * u + c * v + cy + 0.15 * Math.cos(g.t * 0.23);
+    S.x[2 * d] = X; S.x[2 * d + 1] = Y;
+    minX = Math.min(minX, X); maxX = Math.max(maxX, X); minY = Math.min(minY, Y); maxY = Math.max(maxY, Y);
+  }
+  const fix = (lo, hi) => (hi - lo > 1 ? 0.5 - (lo + hi) / 2 : lo < 0 ? -lo : hi > 1 ? 1 - hi : 0);
+  const dx = fix(minX, maxX), dy = fix(minY, maxY);
+  for (let d = 0; d < count; d++) { S.x[2 * d] += dx; S.x[2 * d + 1] += dy; }
+}
+
+function startTracker() {
+  makeProblem();
+  S.history = [];
+  const anchors = pinList();
+  let init = S.x, initialStd = 1e-4;
+  if (S.start === 'cold') {
+    const y = E.measure(S.p, S.x, rng);
+    const sol = E.coldStart(S.p, y, rng).x;
+    // The solved layout has no frame of its own. It is rotated onto the true one
+    // here only so it can be drawn over the devices; the system is not told this.
+    init = E.aligned(sol, S.x, 2, { reflect: true });
+    for (const a of anchors) { init[2 * a] = S.x[2 * a]; init[2 * a + 1] = S.x[2 * a + 1]; }
+    initialStd = Math.max(0.02, 2 * S.p.sigma);
+  }
+  S.tracker = new E.Tracker(S.p, init, { rng, anchors, initialStd });
+  S.y = E.measure(S.p, S.x, rng);
+  buildMarks();
+}
+
+function rebuild() {
+  makeProblem();
+  if (S.on) startTracker(); else buildMarks();
+  resetMotion();
+  paintSetup();
+  buildTable();
+}
+
+function resize(n, k) {
+  const fresh = randomLayout(n, k, rng);
+  const next = new Float64Array((n + k) * 2);
+  for (let i = 0; i < n; i++) {
+    const src = i < S.n ? S.x : fresh;
+    next[2 * i] = src[2 * i]; next[2 * i + 1] = src[2 * i + 1];
+  }
+  for (let j = 0; j < k; j++) {
+    const to = 2 * (n + j);
+    if (j < S.k) { next[to] = S.x[2 * (S.n + j)]; next[to + 1] = S.x[2 * (S.n + j) + 1]; }
+    else { next[to] = fresh[to]; next[to + 1] = fresh[to + 1]; }
+  }
+  S.n = n; S.k = k; S.x = next;
+  rebuild();
+}
+
+// ---- drawing ----
+const arena = $('arena');
+let L = {};
+const R_MARK = 0.018;
+
+function buildMarks() {
+  arena.textContent = '';
+  const defs = svgEl('defs', {}, arena);
+  svgEl('rect', { x: 0, y: 0, width: 1, height: 1 }, svgEl('clipPath', { id: 'arenaClip' }, defs));
+  svgEl('rect', { x: 0, y: 0, width: 1, height: 1, fill: 'none', stroke: 'var(--axis)', 'stroke-width': 0.002 }, arena);
+  for (let g = 0.25; g < 1; g += 0.25) {
+    svgEl('line', { x1: g, y1: 0, x2: g, y2: 1, stroke: 'var(--grid)', 'stroke-width': 0.0015 }, arena);
+    svgEl('line', { x1: 0, y1: g, x2: 1, y2: g, stroke: 'var(--grid)', 'stroke-width': 0.0015 }, arena);
+  }
+  const count = S.n + S.k;
+  L = { edges: [], rings: [], links: [], est: [], tru: [], labels: [], hits: [] };
+  const eg = svgEl('g', {}, arena), rg = svgEl('g', { 'clip-path': 'url(#arenaClip)' }, arena), lg = svgEl('g', {}, arena), est = svgEl('g', {}, arena), tg = svgEl('g', {}, arena), hg = svgEl('g', {}, arena);
+  for (let m = 0; m < S.n * S.k; m++) L.edges.push(svgEl('line', { stroke: 'var(--axis)', 'stroke-width': 0.0012, opacity: 0.55 }, eg));
+  if (!reduced) for (let j = 0; j < S.k; j++) L.rings.push(svgEl('circle', { fill: 'none', stroke: 'var(--tx)', 'stroke-width': 0.0018 }, rg));
+  const pins = new Set(pinList());
+  for (let a = 0; a < count; a++) {
+    const isRx = a < S.n;
+    const color = isRx ? 'var(--rx)' : 'var(--tx)';
+    L.links.push(svgEl('line', { stroke: 'var(--crit)', 'stroke-width': 0.003 }, lg));
+    const shape = (fill, stroke, sw, scale) => (isRx
+      ? { tag: 'circle', attrs: { r: R_MARK * scale, fill, stroke, 'stroke-width': sw } }
+      : { tag: 'rect', attrs: { x: -R_MARK * scale * 0.85, y: -R_MARK * scale * 0.85, width: 2 * R_MARK * scale * 0.85, height: 2 * R_MARK * scale * 0.85, transform: 'rotate(45)', fill, stroke, 'stroke-width': sw } });
+    const eGroup = svgEl('g', {}, est);
+    const es = shape('none', color, 0.0045, 1.2);
+    svgEl(es.tag, es.attrs, eGroup);
+    L.est.push(eGroup);
+    const tGroup = svgEl('g', {}, tg);
+    const ts = shape(color, 'var(--surface)', 0.004, 1);
+    if (pins.has(a)) svgEl('circle', { r: R_MARK * 1.9, fill: 'none', stroke: 'var(--ink-2)', 'stroke-width': 0.003 }, tGroup);
+    svgEl(ts.tag, ts.attrs, tGroup);
+    const label = isRx ? 'R' + (a + 1) : 'S' + (a - S.n + 1);
+    const t = svgEl('text', { y: 0.012, 'font-size': 0.031, fill: 'var(--ink-2)', style: 'font-family:var(--mono)' }, tGroup);
+    t.textContent = label;
+    L.labels.push(t);
+    L.tru.push(tGroup);
+    const hit = svgEl('circle', { r: 0.05, class: 'hit' + (pins.has(a) ? ' pinned' : ''), tabindex: 0, role: 'button', 'aria-label': (isRx ? 'Receiver ' + (a + 1) : 'Source ' + (a - S.n + 1)) + (pins.has(a) ? ', pinned' : '') }, hg);
+    hit.dataset.a = a;
+    L.hits.push(hit);
+  }
+}
+
+function render(now) {
+  const { x, n, k, tracker } = S;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < k; j++) {
+      const e = L.edges[i * k + j];
+      e.setAttribute('x1', x[2 * i]); e.setAttribute('y1', x[2 * i + 1]);
+      e.setAttribute('x2', x[2 * (n + j)]); e.setAttribute('y2', x[2 * (n + j) + 1]);
+    }
+  }
+  L.rings.forEach((r, j) => {
+    if (!S.on) { r.setAttribute('opacity', 0); return; }
+    const phase = ((now / 1600 + j / Math.max(k, 1)) % 1);
+    r.setAttribute('cx', x[2 * (n + j)]); r.setAttribute('cy', x[2 * (n + j) + 1]);
+    r.setAttribute('r', 0.02 + phase * 0.3);
+    r.setAttribute('opacity', 0.28 * (1 - phase));
+  });
+  const belief = S.on && tracker ? (S.view === 'aligned' ? E.aligned(tracker.x, x, 2) : tracker.x) : null;
+  for (let a = 0; a < n + k; a++) {
+    const X = x[2 * a], Y = x[2 * a + 1];
+    L.tru[a].setAttribute('transform', `translate(${X} ${Y})`);
+    const flip = X > 0.9;
+    L.labels[a].setAttribute('x', flip ? -0.03 : 0.03);
+    L.labels[a].setAttribute('text-anchor', flip ? 'end' : 'start');
+    L.hits[a].setAttribute('cx', X); L.hits[a].setAttribute('cy', Y);
+    const visible = S.on && tracker;
+    L.est[a].setAttribute('opacity', visible ? 1 : 0);
+    L.links[a].setAttribute('opacity', visible ? 0.75 : 0);
+    if (visible) {
+      const ex = belief[2 * a], ey = belief[2 * a + 1];
+      L.est[a].setAttribute('transform', `translate(${ex} ${ey})`);
+      L.links[a].setAttribute('x1', X); L.links[a].setAttribute('y1', Y);
+      L.links[a].setAttribute('x2', ex); L.links[a].setAttribute('y2', ey);
+    }
+  }
+}
+
+function sample(now) {
+  const dragged = S.drag;
+  const held = dragged && !dragged.all ? [S.x[2 * dragged.a], S.x[2 * dragged.a + 1]] : null;
+  if (S.move && !(dragged && dragged.all)) S.move();
+  if (held) { S.x[2 * dragged.a] = held[0]; S.x[2 * dragged.a + 1] = held[1]; }
+  S.y = E.measure(S.p, S.x, rng);
+  S.tracker.step(S.y);
+  const shape = E.shapeRms(S.tracker.x, S.x, 2);
+  const mirror = E.shapeRms(S.tracker.x, S.x, 2, { reflect: true });
+  const abs = E.absoluteRms(S.tracker.x, S.x, 2);
+  S.history.push([shape, abs]);
+  if (S.history.length > 240) S.history.shift();
+  S.current = { shape, mirror, abs };
+  if (now - S.lastTable > 220) { S.lastTable = now; paintStatus(); paintTable(); paintSpark(); }
+}
+
+function setChip(el, cls, text) { el.className = 'chip ' + cls; el.textContent = text; }
+
+function paintStatus() {
+  const c = S.current;
+  if (!S.on || !c) {
+    setChip($('truthChip'), 'idle', 'Off');
+    setChip($('selfChip'), 'idle', 'Off');
+    $('shapeErr').textContent = '–'; $('absErr').textContent = '–';
+    return;
+  }
+  if (c.shape < LOST) setChip($('truthChip'), 'good', c.abs < LOST ? 'Correct' : 'Layout correct, whole group offset');
+  else if (c.mirror < LOST) setChip($('truthChip'), 'warn', 'Layout mirrored');
+  else setChip($('truthChip'), 'bad', 'Layout wrong');
+  if (S.tracker.nu <= 0) setChip($('selfChip'), 'warn', 'Can’t check itself: no spare readings');
+  else if (S.tracker.flagged) setChip($('selfChip'), 'bad', 'Readings don’t fit');
+  else setChip($('selfChip'), 'good', 'Readings fit');
+  $('shapeErr').textContent = pct(c.shape);
+  $('absErr').textContent = pct(c.abs);
+}
+
+function paintSpark() {
+  const svg = $('spark');
+  svg.textContent = '';
+  const W = 310, H = 86, top = 0.3;
+  const yOf = (v) => H - 2 - (Math.min(v, top) / top) * (H - 6);
+  const yFive = yOf(LOST);
+  svgEl('line', { x1: 0, x2: W, y1: H - 2, y2: H - 2, stroke: 'var(--axis)', 'stroke-width': 1, 'vector-effect': 'non-scaling-stroke' }, svg);
+  svgEl('line', { x1: 0, x2: W, y1: yFive, y2: yFive, stroke: 'var(--ink-3)', 'stroke-width': 1, 'vector-effect': 'non-scaling-stroke' }, svg);
+  const t = svgEl('text', { x: W - 2, y: yFive - 3, 'text-anchor': 'end', style: 'font:400 10px var(--mono);fill:var(--ink-3)' }, svg);
+  t.textContent = '5%';
+  const t2 = svgEl('text', { x: W - 2, y: 10, 'text-anchor': 'end', style: 'font:400 10px var(--mono);fill:var(--ink-3)' }, svg);
+  t2.textContent = '30%+';
+  [[1, 'var(--tx)'], [0, 'var(--rx)']].forEach(([idx, color]) => {
+    const pts = S.history.map((h, i) => `${(i / 239) * W},${yOf(h[idx])}`).join(' ');
+    if (pts) svgEl('polyline', { points: pts, fill: 'none', stroke: color, 'stroke-width': 2, 'vector-effect': 'non-scaling-stroke', 'stroke-linejoin': 'round' }, svg);
+  });
+}
+
+function buildTable() {
+  const t = $('readings');
+  let html = '<thead><tr><th></th>';
+  for (let j = 0; j < S.k; j++) html += `<th scope="col">S${j + 1}</th>`;
+  html += '</tr></thead><tbody>';
+  for (let i = 0; i < S.n; i++) {
+    html += `<tr><th scope="row">R${i + 1}</th>`;
+    for (let j = 0; j < S.k; j++) html += `<td id="c${i}_${j}">–</td>`;
+    html += '</tr>';
+  }
+  t.innerHTML = html + '</tbody>';
+  $('readUnit').textContent = S.signal === 'range' ? 'Arrival delay, as distance' : 'Log distance from strength';
+}
+
+function paintTable() {
+  if (!S.on || !S.y) return;
+  const lo = S.signal === 'range' ? 0 : -3.5, hi = S.signal === 'range' ? 1.2 : 0.3;
+  for (let i = 0; i < S.n; i++) {
+    for (let j = 0; j < S.k; j++) {
+      const v = S.y[i * S.k + j];
+      const td = $(`c${i}_${j}`);
+      if (!td) continue;
+      td.textContent = v.toFixed(2);
+      const f = Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
+      td.style.background = `color-mix(in oklab, var(--rx) ${Math.round(4 + f * 38)}%, var(--surface))`;
+    }
+  }
+}
+
+function setupText() {
+  const { n, k } = S;
+  if (Math.min(n, k) < 3) return 'Too few readings. The layout can bend without changing any of them, so tracking drifts.';
+  if (n === 3 && k === 3) return 'Just enough readings, with several layouts that fit exactly and none spare to detect a mistake.';
+  return `One layout fits, with ${n * k - (2 * (n + k) - 3)} spare reading${n * k - (2 * (n + k) - 3) === 1 ? '' : 's'} to catch mistakes.`;
+}
+function paintSetup() { $('setupNote').textContent = setupText(); }
+
+function paintControls() {
+  $('nOut').textContent = S.n; $('kOut').textContent = S.k;
+  $('speedOut').textContent = (SPEEDS[S.speedI] * 100) + '% of arena per reading';
+  const sig = NOISE[S.signal][S.noiseI];
+  $('noiseOut').textContent = S.signal === 'range'
+    ? (sig * 100).toFixed(1).replace(/\.0$/, '') + '% of arena'
+    : (sig * 100).toFixed(0) + '% of distance, about ' + (8.686 * sig).toFixed(1) + ' dB';
+  $('pinOut').textContent = Math.min(S.pins, S.k);
+  $('power').textContent = S.on ? 'Turn off' : 'Turn on';
+}
+
+// ---- input ----
+function toArena(ev) {
+  const pt = arena.createSVGPoint();
+  pt.x = ev.clientX; pt.y = ev.clientY;
+  const q = pt.matrixTransform(arena.getScreenCTM().inverse());
+  return [q.x, q.y];
+}
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+
+function moveAll(dx, dy) {
+  const count = S.n + S.k;
+  let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+  for (let d = 0; d < count; d++) {
+    minX = Math.min(minX, S.x[2 * d]); maxX = Math.max(maxX, S.x[2 * d]);
+    minY = Math.min(minY, S.x[2 * d + 1]); maxY = Math.max(maxY, S.x[2 * d + 1]);
+  }
+  dx = Math.max(-minX, Math.min(1 - maxX, dx));
+  dy = Math.max(-minY, Math.min(1 - maxY, dy));
+  for (let d = 0; d < count; d++) { S.x[2 * d] += dx; S.x[2 * d + 1] += dy; }
+}
+
+arena.addEventListener('pointerdown', (ev) => {
+  const t = ev.target;
+  if (!t.classList || !t.classList.contains('hit')) return;
+  const a = +t.dataset.a;
+  const [px, py] = toArena(ev);
+  const all = ev.shiftKey;
+  if (!all && pinList().includes(a)) return;
+  S.drag = { a, all, ox: S.x[2 * a] - px, oy: S.x[2 * a + 1] - py, px, py };
+  try { arena.setPointerCapture(ev.pointerId); } catch (_) { /* optional */ }
+  ev.preventDefault();
+});
+arena.addEventListener('pointermove', (ev) => {
+  if (!S.drag) return;
+  const [px, py] = toArena(ev);
+  if (S.drag.all) { moveAll(px - S.drag.px, py - S.drag.py); S.drag.px = px; S.drag.py = py; return; }
+  S.x[2 * S.drag.a] = clamp01(px + S.drag.ox);
+  S.x[2 * S.drag.a + 1] = clamp01(py + S.drag.oy);
+});
+const endDrag = () => {
+  if (S.drag && S.drag.all && S.group) S.group.base = Float64Array.from(S.x);
+  S.drag = null;
+};
+arena.addEventListener('pointerup', endDrag);
+arena.addEventListener('pointercancel', endDrag);
+arena.addEventListener('keydown', (ev) => {
+  const t = ev.target;
+  if (!t.classList || !t.classList.contains('hit')) return;
+  const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[ev.key];
+  if (!d) return;
+  ev.preventDefault();
+  const a = +t.dataset.a;
+  if (ev.shiftKey) { moveAll(d[0] * 0.02, d[1] * 0.02); return; }
+  if (pinList().includes(a)) return;
+  S.x[2 * a] = clamp01(S.x[2 * a] + d[0] * 0.02);
+  S.x[2 * a + 1] = clamp01(S.x[2 * a + 1] + d[1] * 0.02);
+});
+
+$('power').addEventListener('click', () => {
+  S.on = !S.on;
+  S.current = null;
+  if (S.on) { startTracker(); resetMotion(); }
+  else { S.tracker = null; S.y = null; S.history = []; paintSpark(); buildMarks(); }
+  paintControls(); paintStatus();
+  for (const td of $('readings').querySelectorAll('td')) { td.textContent = '–'; td.style.background = ''; }
+});
+$('shuffle').addEventListener('click', () => { S.x = randomLayout(S.n, S.k, rng); rebuild(); });
+$('nIn').addEventListener('input', (e) => { resize(+e.target.value, S.k); paintControls(); });
+$('kIn').addEventListener('input', (e) => { resize(S.n, +e.target.value); paintControls(); });
+$('speedIn').addEventListener('input', (e) => { S.speedI = +e.target.value; resetMotion(); paintControls(); });
+$('noiseIn').addEventListener('input', (e) => { S.noiseI = +e.target.value; if (S.p) S.p.sigma = NOISE[S.signal][S.noiseI]; paintControls(); });
+$('pinIn').addEventListener('input', (e) => { S.pins = +e.target.value; rebuild(); paintControls(); });
+bindSeg($('motion'), S.motion, (v) => { S.motion = v; resetMotion(); });
+bindSeg($('view'), S.view, (v) => { S.view = v; });
+bindSeg($('signal'), S.signal, (v) => { S.signal = v; rebuild(); paintControls(); });
+bindSeg($('start'), S.start, (v) => { S.start = v; rebuild(); });
+
+let last = performance.now(), acc = 0;
+function loop(now) {
+  const dt = Math.min(now - last, 200);
+  last = now;
+  if (S.on && S.tracker && !document.hidden) {
+    acc += dt;
+    let guard = 0;
+    while (acc >= SAMPLE_MS && guard < 2) { sample(now); acc -= SAMPLE_MS; guard++; }
+    if (acc >= SAMPLE_MS) acc = 0;
+  }
+  render(now);
+  requestAnimationFrame(loop);
+}
+
+makeProblem();
+startTracker();
+resetMotion();
+paintSetup();
+buildTable();
+paintControls();
+render(performance.now());
+requestAnimationFrame(loop);
+
+// ================= results =================
+if (!R) return;
+const tip = $('tip');
+function showTip(html, ev) {
+  tip.innerHTML = html;
+  tip.hidden = false;
+  const pad = 12;
+  const r = tip.getBoundingClientRect();
+  let left = ev.clientX + window.scrollX + pad;
+  if (left + r.width > window.scrollX + document.documentElement.clientWidth - 8) left = ev.clientX + window.scrollX - r.width - pad;
+  tip.style.left = Math.max(8, left) + 'px';
+  tip.style.top = (ev.clientY + window.scrollY - r.height - pad) + 'px';
+}
+const hideTip = () => { tip.hidden = true; };
+
+const heatBg = (f) => `color-mix(in oklab, var(--accent) ${Math.round(4 + 88 * f)}%, var(--surface))`;
+const heatFg = (f) => (f > 0.62 ? 'var(--on-accent)' : 'var(--ink)');
+
+function gridTable(el, rows, cols, cell, rowTitle = 'Receivers', colTitle = 'Sources') {
+  let h = `<table class="grid-table"><thead><tr><th></th><th class="axis-title" colspan="${cols.length}" scope="colgroup">${colTitle}</th></tr><tr><th class="axis-title" scope="col">${rowTitle}</th>`;
+  for (const c of cols) h += `<th scope="col">${c}</th>`;
+  h += '</tr></thead><tbody>';
+  for (const r of rows) {
+    h += `<tr><th scope="row">${r}</th>`;
+    for (const c of cols) {
+      const { text, bg, fg, tip: t } = cell(r, c);
+      h += `<td style="background:${bg};color:${fg}"${t ? ` data-tip="${esc(t).replace(/"/g, '&quot;')}"` : ''}>${text}</td>`;
+    }
+    h += '</tr>';
+  }
+  el.innerHTML = h + '</tbody></table>';
+  el.querySelectorAll('[data-tip]').forEach((td) => {
+    td.addEventListener('pointermove', (ev) => showTip(td.dataset.tip, ev));
+    td.addEventListener('pointerleave', hideTip);
+  });
+}
+
+// ---- solvability ----
+function solvCell(dim) {
+  return (n, k) => {
+    const c = R.rigidity.find((q) => q.dim === dim && q.n === n && q.k === k);
+    const min = Math.min(n, k);
+    if (min < dim + 1) return { text: '×', bg: 'transparent', fg: 'var(--ink-3)', tip: `${n} × ${k}: the layout can bend without changing any reading.` };
+    if (!c.rigid) return { text: '×', bg: 'transparent', fg: 'var(--ink-3)', tip: `${n} × ${k}: the layout can bend without changing any reading.` };
+    if (!c.solutions) return { text: '·', bg: heatBg(0.75), fg: heatFg(0.75), tip: `${n} × ${k}: fixed locally. Too large to count solutions here.` };
+    if (c.solutions.max > 1) return { text: String(c.solutions.max), bg: heatBg(0.22), fg: heatFg(0.22), tip: `${n} × ${k}: up to ${c.solutions.max} different layouts fit perfectly.` };
+    return { text: '1', bg: heatBg(0.75), fg: heatFg(0.75), tip: `${n} × ${k}: exactly one layout found on every random test.` };
+  };
+}
+const oneToEight = [1, 2, 3, 4, 5, 6, 7, 8];
+gridTable($('solv2'), oneToEight, oneToEight, solvCell(2));
+gridTable($('solv3'), oneToEight, oneToEight, solvCell(3));
+$('solvLegend').innerHTML = `<span><b>×</b> layout can bend, no unique answer</span><span><i style="background:${heatBg(0.22)}"></i>several exact fits, count shown</span><span><i style="background:${heatBg(0.75)}"></i>one exact fit (1), or too large to count (·)</span>`;
+
+// ---- snapshot ----
+const coldState = { signal: 'range', i: 2 };
+const COLD_NOISE = { range: [0.002, 0.005, 0.01, 0.02, 0.05], strength: [0.02, 0.05, 0.1, 0.2, 0.4] };
+const SIZES = [2, 3, 4, 5, 6, 8];
+const noiseName = (signal, sigma) => (signal === 'range' ? +(sigma * 100).toFixed(1) + '% of arena' : (sigma * 100).toFixed(0) + '% of distance');
+function paintCold() {
+  const sigma = COLD_NOISE[coldState.signal][coldState.i];
+  $('coldNoiseOut').textContent = noiseName(coldState.signal, sigma);
+  const get = (n, k) => R.cold.find((c) => c.model === coldState.signal && c.sigma === sigma && c.n === n && c.k === k);
+  gridTable($('coldHeat'), SIZES, SIZES, (n, k) => {
+    const c = get(n, k);
+    return { text: (c.ok5 * 100).toFixed(0), bg: heatBg(c.ok5), fg: heatFg(c.ok5), tip: `<b>${n} × ${k}</b><br>${pct(c.ok5, 0)} within 5%<br>${pct(c.ok2, 0)} within 2%<br>Median error ${pct(c.median)}<br>Worst 10% above ${pct(c.p90)}` };
+  });
+  gridTable($('boundHeat'), SIZES, SIZES, (n, k) => {
+    const c = get(n, k);
+    return { text: (c.boundOk5 * 100).toFixed(0), bg: heatBg(c.boundOk5), fg: heatFg(c.boundOk5), tip: `<b>${n} × ${k}</b><br>${pct(c.boundOk5, 0)} of layouts allow 5%<br>Median bound ${c.boundMedian === null ? 'none: layout can bend' : pct(c.boundMedian)}` };
+  });
+}
+bindSeg($('coldSignal'), 'range', (v) => { coldState.signal = v; paintCold(); });
+$('coldNoise').addEventListener('input', (e) => { coldState.i = +e.target.value; paintCold(); });
+paintCold();
+
+// ---- line chart ----
+function lineChart(el, { series, xs, xLabel, xFmt, yMax, yFmt, yTicks, log = true, H = 250, yBase = 0, hoverFmt }) {
+  const W = Math.max(280, el.clientWidth || 480), m = { l: 42, r: 74, t: 10, b: 36 };
+  el.textContent = '';
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img' }, el);
+  const lx = (v) => (log ? Math.log10(v) : v);
+  const x0 = lx(xs[0]), x1 = lx(xs[xs.length - 1]);
+  const X = (v) => m.l + ((lx(v) - x0) / (x1 - x0)) * (W - m.l - m.r);
+  const Y = (v) => H - m.b - ((Math.min(v, yMax) - yBase) / (yMax - yBase)) * (H - m.t - m.b);
+  for (const t of yTicks) {
+    svgEl('line', { x1: m.l, x2: W - m.r, y1: Y(t), y2: Y(t), stroke: t === yBase ? 'var(--axis)' : 'var(--grid)', 'stroke-width': 1 }, svg);
+    const tx = svgEl('text', { x: m.l - 6, y: Y(t) + 3.5, 'text-anchor': 'end', class: 'tick' }, svg);
+    tx.textContent = yFmt(t);
+  }
+  for (const v of xs) {
+    const tx = svgEl('text', { x: X(v), y: H - m.b + 15, 'text-anchor': 'middle', class: 'tick' }, svg);
+    tx.textContent = xFmt(v);
+  }
+  const lab = svgEl('text', { x: m.l + (W - m.l - m.r) / 2, y: H - 4, 'text-anchor': 'middle' }, svg);
+  lab.textContent = xLabel;
+  for (const s of series) {
+    const pts = s.points.filter((p) => p.y !== null);
+    svgEl('polyline', { points: pts.map((p) => `${X(p.x)},${Y(p.y)}`).join(' '), fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, svg);
+  }
+  // Direct labels at the right end, pushed apart so they cannot overlap.
+  const ends = series.map((s) => {
+    const pts = s.points.filter((p) => p.y !== null);
+    const p = pts[pts.length - 1];
+    return { s, y: Y(p.y), x: X(p.x), want: Y(p.y) };
+  }).sort((a, b) => a.want - b.want);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 13) ends[i].y = ends[i - 1].y + 13;
+  const over = ends.length ? ends[ends.length - 1].y - (H - m.b + 4) : 0;
+  if (over > 0) for (const e of ends) e.y -= over;
+  for (let i = ends.length - 2; i >= 0; i--) if (ends[i + 1].y - ends[i].y < 13) ends[i].y = ends[i + 1].y - 13;
+  for (const e of ends) {
+    svgEl('circle', { cx: e.x, cy: e.want, r: 4, fill: e.s.color, stroke: 'var(--surface)', 'stroke-width': 2 }, svg);
+    const t = svgEl('text', { x: W - m.r + 8, y: e.y + 4, 'font-weight': 500 }, svg);
+    t.textContent = e.s.name;
+    t.style.fill = 'var(--ink)';
+  }
+  // Hover layer: crosshair snapping to the nearest measured x.
+  const cross = svgEl('line', { y1: m.t, y2: H - m.b, stroke: 'var(--axis)', 'stroke-width': 1, opacity: 0 }, svg);
+  const dots = series.map((s) => svgEl('circle', { r: 4.5, fill: s.color, stroke: 'var(--surface)', 'stroke-width': 2, opacity: 0 }, svg));
+  const overlay = svgEl('rect', { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: 'transparent' }, svg);
+  overlay.addEventListener('pointermove', (ev) => {
+    const box = svg.getBoundingClientRect();
+    const px = ((ev.clientX - box.left) / box.width) * W;
+    let best = xs[0], bd = 1e9;
+    for (const v of xs) { const d = Math.abs(X(v) - px); if (d < bd) { bd = d; best = v; } }
+    cross.setAttribute('x1', X(best)); cross.setAttribute('x2', X(best)); cross.setAttribute('opacity', 1);
+    let html = `<b>${xFmt(best)}</b>`;
+    series.forEach((s, i) => {
+      const p = s.points.find((q) => q.x === best);
+      if (!p || p.y === null) { dots[i].setAttribute('opacity', 0); return; }
+      dots[i].setAttribute('cx', X(best)); dots[i].setAttribute('cy', Y(p.y)); dots[i].setAttribute('opacity', 1);
+      html += `<br>${esc(s.name)}: ${hoverFmt(p.y)}`;
+    });
+    showTip(html, ev);
+  });
+  overlay.addEventListener('pointerleave', () => {
+    cross.setAttribute('opacity', 0);
+    dots.forEach((d) => d.setAttribute('opacity', 0));
+    hideTip();
+  });
+}
+
+function legendHtml(items) {
+  return items.map((s) => `<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join('');
+}
+
+// ---- tracking ----
+const TRACK_PAIRS = [[3, 3], [3, 4], [4, 4], [6, 6]];
+const TRACK_COLORS = ['var(--rx)', 'var(--tx)', 'var(--s3)', 'var(--s4)'];
+const TRACK_SPEEDS = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3];
+const TRACK_NOISE = { range: [0.002, 0.01, 0.03], strength: [0.02, 0.1, 0.3] };
+const trackState = { signal: 'range', i: 1, kind: 'all', size: '4x4' };
+const allPairs = [[2, 2], [3, 3], [3, 4], [4, 4], [5, 5], [6, 6], [8, 8]];
+$('trackSize').innerHTML = allPairs.map(([n, k]) => `<option value="${n}x${k}">${n} × ${k}</option>`).join('');
+$('trackSize').value = trackState.size;
+function fillTrackNoise() {
+  $('trackNoise').innerHTML = TRACK_NOISE[trackState.signal].map((s, i) => `<option value="${i}">${noiseName(trackState.signal, s)}</option>`).join('');
+  $('trackNoise').value = trackState.i;
+}
+const speedFmt = (v) => +(v * 100).toFixed(1) + '%';
+
+function stackedChart(el, rows) {
+  const W = Math.max(280, el.clientWidth || 480), H = 250, m = { l: 42, r: 10, t: 10, b: 36 };
+  el.textContent = '';
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img' }, el);
+  const Y = (v) => H - m.b - v * (H - m.t - m.b);
+  for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+    svgEl('line', { x1: m.l, x2: W - m.r, y1: Y(t), y2: Y(t), stroke: t === 0 ? 'var(--axis)' : 'var(--grid)', 'stroke-width': 1 }, svg);
+    const tx = svgEl('text', { x: m.l - 6, y: Y(t) + 3.5, 'text-anchor': 'end', class: 'tick' }, svg);
+    tx.textContent = (t * 100) + '%';
+  }
+  const band = (W - m.l - m.r) / rows.length;
+  const bw = Math.min(40, band * 0.62);
+  rows.forEach((r, i) => {
+    const cx = m.l + band * (i + 0.5);
+    let base = 0;
+    const parts = [['Correct', r.correct, 'var(--good)'], ['Mirrored', r.mirrored, 'var(--warn)'], ['Wrong', r.wrong, 'var(--crit)']].filter((p) => p[1] > 0.0005);
+    parts.forEach(([name, value, color], pi) => {
+      const y1 = Y(base), y2 = Y(base + value);
+      const isTop = pi === parts.length - 1;
+      const top = y2 + (isTop ? 0 : 1), bottom = y1 - (pi === 0 ? 0 : 1);
+      if (bottom - top < 0.5) { base += value; return; }
+      const rad = isTop ? Math.min(4, (bottom - top)) : 0, l = cx - bw / 2, rr = cx + bw / 2;
+      const d = `M${l},${bottom}L${l},${top + rad}Q${l},${top} ${l + rad},${top}L${rr - rad},${top}Q${rr},${top} ${rr},${top + rad}L${rr},${bottom}Z`;
+      const path = svgEl('path', { d, fill: color }, svg);
+      path.addEventListener('pointermove', (ev) => showTip(`<b>${speedFmt(r.speed)} per reading</b><br>${name}: ${pct(value)}`, ev));
+      path.addEventListener('pointerleave', hideTip);
+      base += value;
+    });
+    const tx = svgEl('text', { x: cx, y: H - m.b + 15, 'text-anchor': 'middle', class: 'tick' }, svg);
+    tx.textContent = speedFmt(r.speed);
+  });
+  const lab = svgEl('text', { x: m.l + (W - m.l - m.r) / 2, y: H - 4, 'text-anchor': 'middle' }, svg);
+  lab.textContent = 'Distance moved per reading, as share of arena side';
+}
+
+function paintTrack() {
+  const sigma = TRACK_NOISE[trackState.signal][trackState.i];
+  const cell = (n, k, speed) => R.track.find((c) => c.model === trackState.signal && c.sigma === sigma && c.kind === trackState.kind && c.n === n && c.k === k && c.speed === speed);
+  const series = TRACK_PAIRS.map(([n, k], i) => ({
+    name: `${n} × ${k}`, color: TRACK_COLORS[i],
+    points: TRACK_SPEEDS.map((speed) => ({ x: speed, y: cell(n, k, speed).correct })),
+  }));
+  lineChart($('trackLines'), {
+    series, xs: TRACK_SPEEDS, xLabel: 'Distance moved per reading, as share of arena side', xFmt: speedFmt,
+    yMax: 1, yFmt: (v) => (v * 100) + '%', yTicks: [0, 0.25, 0.5, 0.75, 1], hoverFmt: (v) => pct(v, 0),
+  });
+  $('trackLegend').innerHTML = legendHtml(series);
+  const [n, k] = trackState.size.split('x').map(Number);
+  const rows = TRACK_SPEEDS.map((speed) => cell(n, k, speed));
+  $('stackTitle').textContent = `What happens at ${n} × ${k}`;
+  stackedChart($('trackStack'), rows);
+  $('stackLegend').innerHTML = legendHtml([{ name: 'Correct', color: 'var(--good)' }, { name: 'Mirrored', color: 'var(--warn)' }, { name: 'Wrong', color: 'var(--crit)' }]);
+  let t = '<table class="data-table"><thead><tr><th>Devices</th><th class="n">Speed</th><th class="n">Correct</th><th class="n">Mirrored</th><th class="n">Wrong</th><th class="n">Wrong, unnoticed</th><th class="n">Runs never lost</th><th class="n">Median layout error</th></tr></thead><tbody>';
+  for (const [a, b] of allPairs) {
+    for (const speed of TRACK_SPEEDS) {
+      const c = cell(a, b, speed);
+      t += `<tr><td>${a} × ${b}</td><td class="n">${speedFmt(speed)}</td><td class="n">${pct(c.correct)}</td><td class="n">${pct(c.mirrored)}</td><td class="n">${pct(c.wrong)}</td><td class="n">${pct(c.silentWrong)}</td><td class="n">${pct(c.cleanRuns, 0)}</td><td class="n">${pct(c.median)}</td></tr>`;
+    }
+  }
+  $('trackTable').innerHTML = t + '</tbody></table>';
+}
+bindSeg($('trackSignal'), 'range', (v) => { trackState.signal = v; fillTrackNoise(); paintTrack(); });
+bindSeg($('trackKind'), 'all', (v) => { trackState.kind = v; paintTrack(); });
+$('trackNoise').addEventListener('change', (e) => { trackState.i = +e.target.value; paintTrack(); });
+$('trackSize').addEventListener('change', (e) => { trackState.size = e.target.value; paintTrack(); });
+fillTrackNoise();
+paintTrack();
+
+// ---- drift ----
+const driftState = { kind: 'all', n: 4 };
+const DRIFT_COLORS = ['var(--rx)', 'var(--tx)', 'var(--s3)', 'var(--s4)'];
+function paintDrift() {
+  const rows = [0, 1, 2, 3].map((a) => R.drift.find((c) => c.n === driftState.n && c.kind === driftState.kind && c.anchors === a));
+  const marks = rows[0].marks;
+  const nm = (a) => (a === 0 ? 'None pinned' : a + ' pinned');
+  const series = rows.map((c) => ({ name: nm(c.anchors), color: DRIFT_COLORS[c.anchors], points: marks.map((x, i) => ({ x, y: c.median[i] })) }));
+  const top = Math.max(0.1, ...rows.flatMap((c) => c.median));
+  const yMax = top > 0.5 ? 1 : top > 0.25 ? 0.5 : 0.25;
+  const yTicks = yMax === 1 ? [0, 0.25, 0.5, 0.75, 1] : yMax === 0.5 ? [0, 0.1, 0.2, 0.3, 0.4, 0.5] : [0, 0.05, 0.1, 0.15, 0.2, 0.25];
+  lineChart($('driftLines'), {
+    series, xs: marks, xLabel: 'Readings since switch-on', xFmt: (v) => String(v),
+    yMax, yFmt: (v) => (v * 100).toFixed(0) + '%', yTicks, hoverFmt: (v) => pct(v), H: 230,
+  });
+  $('driftLegend').innerHTML = legendHtml(series);
+  let t = '<table class="data-table"><thead><tr><th>Pinned</th>';
+  for (const m of marks) t += `<th class="n">After ${m}</th>`;
+  t += '<th class="n">90th percentile at end</th><th class="n">Mirrored at end</th></tr></thead><tbody>';
+  for (const c of rows) {
+    t += `<tr><td>${nm(c.anchors)}</td>`;
+    for (const v of c.median) t += `<td class="n">${pct(v)}</td>`;
+    t += `<td class="n">${pct(c.p90[c.p90.length - 1])}</td><td class="n">${pct(c.mirroredEnd, 0)}</td></tr>`;
+  }
+  $('driftTable').innerHTML = t + '</tbody></table>';
+}
+bindSeg($('driftKind'), 'all', (v) => { driftState.kind = v; paintDrift(); });
+$('driftSize').addEventListener('change', (e) => { driftState.n = +e.target.value; paintDrift(); });
+paintDrift();
+
+let resizeTimer = 0, lastWidth = document.documentElement.clientWidth;
+window.addEventListener('resize', () => {
+  if (document.documentElement.clientWidth === lastWidth) return;
+  lastWidth = document.documentElement.clientWidth;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { paintTrack(); paintDrift(); }, 120);
+});
+
+// ---- placement ----
+(function paintPlacement() {
+  const names = ['random', 'sources around, receivers inside', 'shared circle', 'sources in a line', 'two parallel lines', 'two far clusters'];
+  const pretty = { random: 'Random', 'sources around, receivers inside': 'Sources around, receivers inside', 'shared circle': 'Everything on one circle', 'sources in a line': 'Sources in a straight line', 'two parallel lines': 'Each group on its own parallel line', 'two far clusters': 'Two distant clusters' };
+  const sizes = [[3, 3], [4, 4], [6, 6]];
+  let t = '<thead><tr><th>Placement</th>';
+  for (const [n, k] of sizes) t += `<th class="n">${n} × ${k} solved</th><th class="n">${n} × ${k} bound</th>`;
+  t += '</tr></thead><tbody>';
+  for (const name of names) {
+    t += `<tr><td>${pretty[name]}</td>`;
+    for (const [n, k] of sizes) {
+      const c = R.placement.find((q) => q.name === name && q.n === n && q.k === k);
+      const bound = c.boundMedian === null ? 'none' : c.boundMedian > 1 ? '>100%' : pct(c.boundMedian);
+      t += `<td class="n">${pct(c.ok5, 0)}</td><td class="n">${bound}</td>`;
+    }
+    t += '</tr>';
+  }
+  $('placeTable').innerHTML = t + '</tbody>';
+})();
+})();
+</script>
